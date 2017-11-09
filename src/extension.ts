@@ -2,11 +2,12 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 
 const TEST_OR_FIXTURE_RE = /(^|;|\s+|\/\/|\/\*)fixture\s*(\(.+?\)|`.+?`)|(^|;|\s+|\/\/|\/\*)test\s*\(\s*(.+?)\s*,/gm;
 const CLEANUP_TEST_OR_FIXTURE_NAME_RE = /(^\(?\s*(\'|"|`))|((\'|"|`)\s*\)?$)/g;
 const BROWSER_ALIASES = ['ie', 'firefox', 'chrome', 'chromium', 'opera', 'safari', 'edge'];
-const TESTCAFE_PATH = "/node_modules/testcafe/lib/cli/index.js";
+const TESTCAFE_PATH = "./node_modules/testcafe/lib/cli/index.js";
 
 var browserTools = require ('testcafe-browser-tools');
 let controller: TestCafeTestController = null;
@@ -221,7 +222,7 @@ class TestCafeTestController {
         return ['', ''];
     }
     
-    private getOverriddenWorkspacePath ():string {
+    private getOverriddenWorkspacePath(): string {
         const alternateWorkspacePath = vscode.workspace.getConfiguration('testcafeTestRunner').get('workspaceRoot')
         if (typeof(alternateWorkspacePath) === 'string' && alternateWorkspacePath.length > 0 ){
             return alternateWorkspacePath
@@ -253,22 +254,24 @@ class TestCafeTestController {
         }
 
         const workspacePathOverride = this.getOverriddenWorkspacePath()
-        var testCafePath = vscode.workspace.rootPath + workspacePathOverride + TESTCAFE_PATH;
+        var testCafePath = path.resolve(vscode.workspace.rootPath, workspacePathOverride, TESTCAFE_PATH);
         if(!fs.existsSync(testCafePath)) {
-            vscode.window.showErrorMessage(`TestCafe package is not found. Checked path: ${testCafePath}. Install the testcafe package to your working directory.`);
+            vscode.window.showErrorMessage(`TestCafe package is not found at path ${testCafePath}. Install the testcafe package in your working directory or set the "testcafeTestRunner.workspaceRoot" property.`);
             return;
         }
-
-        vscode.commands.executeCommand("vscode.startDebug", {
-            "type": "node2",
-            "request": "launch",
-            "name": "Launch current test(s) with TestCafe",
-            "program": testCafePath,
-            "args": args,
-            "cwd": "${workspaceRoot}" + workspacePathOverride,
-            "console": "integratedTerminal",
-            "internalConsoleOptions": "neverOpen",
-            "runtimeArgs": [
+        
+        var workingDirectory = path.resolve(vscode.workspace.rootPath, workspacePathOverride);
+        var wsFolder = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0] : undefined;
+        vscode.debug.startDebugging(wsFolder, {
+            name: "Launch current test(s) with TestCafe",
+            request: "launch",
+            type: "node",
+            cwd: workingDirectory,
+            program: testCafePath,
+            args: args,
+            console: "integratedTerminal",
+            internalConsoleOptions: "neverOpen",
+            runtimeArgs: [
                 "--no-deprecation"
             ]
         });
